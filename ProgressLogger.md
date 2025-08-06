@@ -33,10 +33,6 @@
 
 - Implemented class weighting to correct the model's bias towards the majority class.
 
-- Switched to a combined training approach, fine-tuning the top layers of the ResNet50 model from the start.
-
-- Achieved a significant jump in validation accuracy from 56% to 81.25%. This is a major breakthrough, and the model is now performing as expected.
-
 ---
 
 ## 2 August 2025 💻
@@ -60,12 +56,14 @@
 ## 3 August 2025 🛠️
 
 - Defined a new roadmap for further model improvement
+  
+- Switched to a combined training approach, fine-tuning the top layers of the ResNet50 model from the start.
+  
+- Achieved a significant jump in validation accuracy from 56% to 81.25%. This is a major breakthrough, and the model is now performing as expected.
 
 - The goal is to push the validation accuracy beyond 81.25%.
 
 - Outlined a plan to systematically tune hyperparameters, including learning rate and unfreezing more layers in the base model.
-
-- Decided to explore alternative pre-trained models, such as DenseNet121 or EfficientNetB0, to potentially achieve higher performance.
 
 - Began integrating explainable AI (Grad-CAM) to visualize model decisions, which will be a key feature for transparency.
 

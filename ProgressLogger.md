@@ -39,15 +39,15 @@
 
 - Backend development on the Flask server
 
-- Successfully integrated the model into the backend. The server can now load the saved .h5 model file.
+  - Successfully integrated the model into the backend. The server can now load the saved .h5 model file.
 
-- Developed API endpoints to handle file uploads and return real-time predictions.
+  - Developed API endpoints to handle file uploads and return real-time predictions.
 
 - Frontend development for seamless user experience
 
-- Connected the file upload and preview UI to the Flask backend.
+  - Connected the file upload and preview UI to the Flask backend.
 
-- Designed and implemented a results dashboard to display the model's prediction, confidence score, and other key metrics.
+  - Designed and implemented a results dashboard to display the model's prediction, confidence score
 
 - The project is now a fully functional, end-to-end application.
 
@@ -55,13 +55,25 @@
 
 ## 3 August 2025 🛠️
 
+- Integrated Generative AI for personalized health guidance
+
+  - Successfully connected our model's prediction results to the Gemini-pro API.
+
+  - The system now automatically generates personalized, non-diagnostic health and wellness advice for a user based on whether their X-ray was           classified as Pneumonia, Normal, or an Anomaly.
+
+  - This feature adds a valuable layer of user-centricity to the application.
+
+---
+
+## 4 August 2025 🛠️
+
 - Defined a new roadmap for further model improvement
   
-- Switched to a combined training approach, fine-tuning the top layers of the ResNet50 model from the start.
+  - Switched to a combined training approach, fine-tuning the top layers of the ResNet50 model from the start.
   
-- Achieved a significant jump in validation accuracy from 56% to 81.25%. This is a major breakthrough, and the model is now performing as expected.
+  - Achieved a significant jump in validation accuracy from 56% to 81.25%. This is a major breakthrough, and the model is now performing as expected.
 
-- The goal is to push the validation accuracy beyond 81.25%.
+  - The goal is to push the validation accuracy beyond 81.25%.
 
 - Outlined a plan to systematically tune hyperparameters, including learning rate and unfreezing more layers in the base model.
 

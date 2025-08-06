@@ -101,6 +101,24 @@
 
   - This adds a crucial layer of persistence and allows us to track the application's usage and effectiveness over time.
 
+---
+
+## 6 August 2025 🐞
+
+- Initial Anomaly Detector Evaluation
+
+  - Successfully ran the anomaly detector, confirming the model could load and produce reconstruction errors.
+
+  - Discovered a key inconsistency: the model confidently predicted "Pneumonia" but failed to flag the same image as an          anomaly, revealing a lack of sensitivity.
+
+  - Concluded that the initial autoencoder architecture was too simple and that the anomaly threshold was not optimal.
+
+- Anomalies Detected
+
+  - Observed that the model was incorrectly identifying watermarks and text overlays as anomalies in some images.
+
+  - Outlined a plan to retrain the autoencoder on a cleaner dataset and correct the logic for anomaly localization.
+
 
 
 

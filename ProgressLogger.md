@@ -32,6 +32,8 @@
 - Discovered that the initial low accuracy was due to a class imbalance issue, leading to a "lazy" classifier.
 
 - Implemented class weighting to correct the model's bias towards the majority class.
+  
+- Achieved a validation accuracy of 56%
 
 ---
 

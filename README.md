@@ -33,10 +33,9 @@ Users can upload their chest X-ray images through a simple web interface. The ba
 To set up and run this project locally, follow these steps:
 
 1. **Clone the repository:**  
-   git clone https://github.com/your-username/your-repository-name.git  
+   git clone https://github.com/eeshchaturvedi/Pneumonia-Disease-Prediction-and-Anomaly-Detection-Using-X-ray-Images 
    cd your-repository-name
 
-   *(**Note**: Replace your-username/your-repository-name.git with your actual repository URL.)*  
 2. **Create a Python Virtual Environment (Recommended):**  
    python \-m venv venv  
    \# On macOS/Linux:  
@@ -83,9 +82,8 @@ To set up and run this project locally, follow these steps:
          print("--- Generative AI Model configured successfully \---")
 
    * Option B (Current \- Hardcoded):  
-     If you choose to keep it hardcoded for local testing, ensure your API key is correctly placed in app.py:  
-     API\_KEY \= 'AIzaSyDSTTkSOCGJLhtpFbcTkgomKvdtDnJndho' \# Your API key
-
+     If you choose to keep it hardcoded for local testing, ensure your API key is correctly placed in app.py:
+     
      *(**Security Warning**: Hardcoding API keys is not recommended for production environments.)*
 
 ## **Usage**

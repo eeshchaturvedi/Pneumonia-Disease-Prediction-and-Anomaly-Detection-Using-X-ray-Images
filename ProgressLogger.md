@@ -81,6 +81,26 @@
 
 - Began integrating explainable AI (Grad-CAM) to visualize model decisions, which will be a key feature for transparency.
 
+---
+
+## 5 August 2025 🚀
+
+- Final model training and evaluation
+
+  - Completed the final combined training phase, achieving a significant boost in performance.
+
+  - Final test set results were highly encouraging, with a Test Accuracy of 84.94%, a well-balanced Test Precision of 88.34%, and a Test Recall of      87.44%.
+
+  - The model is now performing at a high level and is ready for final deployment.
+
+- Database integration
+
+  - Began integrating a database into the backend of the project.
+
+  - The database will be used to store user information, prediction history, and model performance metrics.
+
+  - This adds a crucial layer of persistence and allows us to track the application's usage and effectiveness over time.
+
 
 
 

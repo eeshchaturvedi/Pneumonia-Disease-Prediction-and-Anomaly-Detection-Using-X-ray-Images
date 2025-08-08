@@ -194,202 +194,214 @@
     </div>
 
     <script>
-        // --- INTEGRATED SCRIPT ---
+    // --- INTEGRATED SCRIPT ---
 
-        // --- Mock Data and Placeholder Functions (Preserved) ---
-        const mockPatients = [
-            { id: "1", name: "John Smith", age: 45, lastVisit: "2025-08-05", status: "pneumonia" },
-            { id: "2", name: "Mary Johnson", age: 32, lastVisit: "2025-08-04", status: "normal" },
-            { id: "3", name: "Robert Brown", age: 67, lastVisit: "2025-08-03", status: "analyzed" },
-            { id: "4", name: "Sarah Davis", age: 28, lastVisit: "2025-08-02", status: "pending" }
-        ];
-        let currentPatient = null;
-        
-        // --- DOM Elements for Analysis ---
-        const patientForm = document.getElementById('patientForm');
-        const analysisResults = document.getElementById('analysisResults');
-        const uploadArea = document.getElementById('uploadArea');
-        const uploadContent = document.getElementById('uploadContent');
-        const xrayInput = document.getElementById('xrayInput');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const xrayImage = document.getElementById('xrayImage');
-        const xrayOverlay = document.getElementById('xrayOverlay');
-        const ctx = xrayOverlay.getContext('2d');
-        
-        let uploadedFile = null;
-        let analysisResultData = null;
+    // --- Mock Data and Placeholder Functions (Preserved) ---
+    const mockPatients = [
+        { id: "1", name: "John Smith", age: 45, lastVisit: "2025-08-05", status: "pneumonia" },
+        { id: "2", name: "Mary Johnson", age: 32, lastVisit: "2025-08-04", status: "normal" },
+        { id: "3", name: "Robert Brown", age: 67, lastVisit: "2025-08-03", status: "analyzed" },
+        { id: "4", name: "Sarah Davis", age: 28, lastVisit: "2025-08-02", status: "pending" }
+    ];
+    let currentPatient = null;
+    
+    // --- DOM Elements for Analysis ---
+    const patientForm = document.getElementById('patientForm');
+    const analysisResults = document.getElementById('analysisResults');
+    const uploadArea = document.getElementById('uploadArea');
+    const uploadContent = document.getElementById('uploadContent');
+    const xrayInput = document.getElementById('xrayInput');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const xrayImage = document.getElementById('xrayImage');
+    const xrayOverlay = document.getElementById('xrayOverlay');
+    const ctx = xrayOverlay.getContext('2d');
+    
+    let uploadedFile = null;
+    let analysisResultData = null;
 
-        // --- Initial Setup ---
-        document.addEventListener('DOMContentLoaded', () => {
-            renderPatientList();
-            setupEventListeners();
+    // --- Initial Setup ---
+    document.addEventListener('DOMContentLoaded', () => {
+        renderPatientList();
+        setupEventListeners();
+    });
+
+    function setupEventListeners() {
+        // File upload listeners
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+        uploadArea.addEventListener('drop', handleDrop);
+        xrayInput.addEventListener('change', handleFileSelect);
+        document.querySelector('.browse-btn').addEventListener('click', () => xrayInput.click());
+
+        // Form validation listeners
+        ['patientName', 'patientAge', 'patientGender'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateAnalyzeButton);
         });
-
-        function setupEventListeners() {
-            // File upload listeners
-            uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-            uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
-            uploadArea.addEventListener('drop', handleDrop);
-            xrayInput.addEventListener('change', handleFileSelect);
-            document.querySelector('.browse-btn').addEventListener('click', () => xrayInput.click());
-
-            // Form validation listeners
-            ['patientName', 'patientAge', 'patientGender'].forEach(id => {
-                document.getElementById(id).addEventListener('input', updateAnalyzeButton);
-            });
-            
-            // Search listener
-            document.getElementById('patientSearch').addEventListener('input', handlePatientSearch);
-            
-            // Analyze button listener
-            analyzeBtn.addEventListener('click', analyzeXray);
-            
-            // Redraw overlay on window resize
-            window.addEventListener('resize', () => { if (analysisResultData) drawOverlay(analysisResultData.anomalies); });
-        }
-
-        // --- Patient List & Form Logic (Preserved) ---
-        function renderPatientList(filteredPatients = mockPatients) {
-            const container = document.getElementById('patientListContainer');
-            document.getElementById('patientCount').textContent = filteredPatients.length;
-            container.innerHTML = filteredPatients.map(patient => `
-                <div class="patient-card ${currentPatient?.id === patient.id ? 'selected' : ''}" onclick="selectPatient('${patient.id}')">
-                    <div class="patient-header">
-                        <div style="flex: 1;"><div class="patient-name-row"><span class="patient-name">${patient.name}</span></div><div class="patient-details"><span>Age ${patient.age}</span><span>•</span><span>${patient.lastVisit}</span></div></div>
-                        <div class="patient-status status-${patient.status}">${patient.status}</div>
-                    </div>
-                </div>`).join('');
-        }
-
-        function selectPatient(patientId) {
-            currentPatient = mockPatients.find(p => p.id === patientId);
-            renderPatientList();
-            document.getElementById('patientName').value = currentPatient.name;
-            document.getElementById('patientAge').value = currentPatient.age;
-            alert("Patient selected. Please upload a new X-ray for analysis.");
-            clearFileUpload();
-            updateAnalyzeButton();
-        }
         
-        function startNewPatient() {
-            currentPatient = null;
-            document.getElementById('patientName').value = '';
-            document.getElementById('patientAge').value = '';
-            document.getElementById('patientGender').value = '';
-            clearFileUpload();
-            patientForm.classList.remove('hidden');
-            analysisResults.classList.add('hidden');
-            renderPatientList();
-            updateAnalyzeButton();
-        }
-
-        function handlePatientSearch() {
-            const query = document.getElementById('patientSearch').value.toLowerCase();
-            const filtered = mockPatients.filter(p => p.name.toLowerCase().includes(query));
-            renderPatientList(filtered);
-        }
-
-        // --- File Handling & Validation (Integrated) ---
-        function handleDrop(e) { e.preventDefault(); uploadArea.classList.remove('drag-over'); if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); }
-        function handleFileSelect(e) { if (e.target.files.length > 0) handleFile(e.target.files[0]); }
-
-        function handleFile(file) {
-            if (!file.type.startsWith('image/')) { alert('Please upload a valid image file.'); return; }
-            uploadedFile = file;
-            uploadArea.classList.add('has-file');
-            uploadContent.querySelector('.upload-title').textContent = 'File ready for analysis!';
-            uploadContent.querySelector('.upload-subtitle').textContent = file.name;
-            updateAnalyzeButton();
-        }
+        // Search listener
+        document.getElementById('patientSearch').addEventListener('input', handlePatientSearch);
         
-        function clearFileUpload() {
-            uploadedFile = null;
-            xrayInput.value = '';
-            uploadArea.classList.remove('has-file');
-            uploadContent.querySelector('.upload-title').textContent = 'Upload front chest X-ray image';
-            uploadContent.querySelector('.upload-subtitle').textContent = 'Drag and drop your X-ray image here, or click to browse';
+        // Analyze button listener
+        analyzeBtn.addEventListener('click', analyzeXray);
+        
+        // Redraw overlay on window resize
+        window.addEventListener('resize', () => { if (analysisResultData) drawOverlay(analysisResultData.anomalies); });
+    }
+
+    // --- Patient List & Form Logic (Preserved) ---
+    function renderPatientList(filteredPatients = mockPatients) {
+        const container = document.getElementById('patientListContainer');
+        document.getElementById('patientCount').textContent = filteredPatients.length;
+        container.innerHTML = filteredPatients.map(patient => `
+            <div class="patient-card ${currentPatient?.id === patient.id ? 'selected' : ''}" onclick="selectPatient('${patient.id}')">
+                <div class="patient-header">
+                    <div style="flex: 1;"><div class="patient-name-row"><span class="patient-name">${patient.name}</span></div><div class="patient-details"><span>Age ${patient.age}</span><span>•</span><span>${patient.lastVisit}</span></div></div>
+                    <div class="patient-status status-${patient.status}">${patient.status}</div>
+                </div>
+            </div>`).join('');
+    }
+
+    function selectPatient(patientId) {
+        currentPatient = mockPatients.find(p => p.id === patientId);
+        renderPatientList();
+        document.getElementById('patientName').value = currentPatient.name;
+        document.getElementById('patientAge').value = currentPatient.age;
+        alert("Patient selected. Please upload a new X-ray for analysis.");
+        clearFileUpload();
+        updateAnalyzeButton();
+    }
+    
+    function startNewPatient() {
+        currentPatient = null;
+        document.getElementById('patientName').value = '';
+        document.getElementById('patientAge').value = '';
+        document.getElementById('patientGender').value = '';
+        clearFileUpload();
+        patientForm.classList.remove('hidden');
+        analysisResults.classList.add('hidden');
+        renderPatientList();
+        updateAnalyzeButton();
+    }
+
+    function handlePatientSearch() {
+        const query = document.getElementById('patientSearch').value.toLowerCase();
+        const filtered = mockPatients.filter(p => p.name.toLowerCase().includes(query));
+        renderPatientList(filtered);
+    }
+
+    // --- File Handling & Validation (Integrated) ---
+    function handleDrop(e) { e.preventDefault(); uploadArea.classList.remove('drag-over'); if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]); }
+    function handleFileSelect(e) { if (e.target.files.length > 0) handleFile(e.target.files[0]); }
+
+    function handleFile(file) {
+        if (!file.type.startsWith('image/')) { alert('Please upload a valid image file.'); return; }
+        uploadedFile = file;
+        uploadArea.classList.add('has-file');
+        uploadContent.querySelector('.upload-title').textContent = 'File ready for analysis!';
+        uploadContent.querySelector('.upload-subtitle').textContent = file.name;
+        updateAnalyzeButton();
+    }
+    
+    function clearFileUpload() {
+        uploadedFile = null;
+        xrayInput.value = '';
+        uploadArea.classList.remove('has-file');
+        uploadContent.querySelector('.upload-title').textContent = 'Upload front chest X-ray image';
+        uploadContent.querySelector('.upload-subtitle').textContent = 'Drag and drop your X-ray image here, or click to browse';
+    }
+
+    function updateAnalyzeButton() {
+        const isValid = document.getElementById('patientName').value && document.getElementById('patientAge').value && document.getElementById('patientGender').value && uploadedFile;
+        analyzeBtn.disabled = !isValid;
+    }
+
+    // --- Backend Integration & Display Logic (REWRITTEN) ---
+    async function analyzeXray() {
+        if (!uploadedFile) { alert("Please upload an X-ray image first."); return; }
+        
+        analyzeBtn.innerHTML = `<svg class="loading" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Analyzing...`;
+        analyzeBtn.style.display = 'flex';
+        analyzeBtn.style.gap = '8px';
+        analyzeBtn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('image', uploadedFile);
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/predict', { method: 'POST', body: formData });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Server error: ${response.statusText}`);
+            }
+            const result = await response.json();
+            displayResults(result);
+        } catch (error) {
+            console.error('Error during analysis:', error);
+            alert('Analysis failed: ' + error.message);
+            resetAnalysisUI();
+        }
+    }
+
+    function resetAnalysisUI() {
+        analyzeBtn.innerHTML = 'Analyze X-ray';
+        analyzeBtn.disabled = false;
+    }
+
+    function displayResults(data) {
+        analysisResultData = data;
+        patientForm.classList.add('hidden');
+        analysisResults.classList.remove('hidden');
+
+        const predictionTitle = document.getElementById('predictionTitle');
+        const predictionBadge = document.getElementById('predictionBadge');
+        if (data.prediction === 'Pneumonia Detected') {
+            predictionTitle.textContent = 'Pneumonia Detected';
+            predictionBadge.textContent = 'PNEUMONIA';
+            predictionBadge.className = 'prediction-badge pneumonia';
+        } else {
+            predictionTitle.textContent = 'Normal';
+            predictionBadge.textContent = 'NORMAL';
+            predictionBadge.className = 'prediction-badge normal';
         }
 
-        function updateAnalyzeButton() {
-            const isValid = document.getElementById('patientName').value && document.getElementById('patientAge').value && document.getElementById('patientGender').value && uploadedFile;
-            analyzeBtn.disabled = !isValid;
-        }
+        document.getElementById('confidenceValue').textContent = `${(data.confidence * 100).toFixed(0)}%`;
+        document.getElementById('guidanceContent').textContent = data.guidance;
 
-        // --- Backend Integration & Display Logic (REWRITTEN) ---
-        async function analyzeXray() {
-            if (!uploadedFile) { alert("Please upload an X-ray image first."); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            xrayImage.src = e.target.result;
+            xrayImage.onload = () => drawOverlay(data.anomalies);
+        };
+        reader.readAsDataURL(uploadedFile);
+    }
+
+    function drawOverlay(anomalies) {
+        const xrayOverlay = document.getElementById('xrayOverlay');
+        const xrayImage = document.getElementById('xrayImage');
+        const ctx = xrayOverlay.getContext('2d');
+
+        xrayOverlay.width = xrayImage.clientWidth;
+        xrayOverlay.height = xrayImage.clientHeight;
+        ctx.clearRect(0, 0, xrayOverlay.width, xrayOverlay.height);
+
+        if (!anomalies || anomalies.length === 0) return;
+
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+
+        anomalies.forEach(anomaly => {
+            // The Python backend now sends normalized values (0-1).
+            // This logic is therefore correct.
+            const x = anomaly.x * xrayOverlay.width;
+            const y = anomaly.y * xrayOverlay.height;
             
-            analyzeBtn.innerHTML = `<svg class="loading" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Analyzing...`;
-            analyzeBtn.style.display = 'flex';
-            analyzeBtn.style.gap = '8px';
-            analyzeBtn.disabled = true;
+            // --- CRITICAL FIX: The radius should be scaled by width, not Math.min(w,h) ---
+            const radius = anomaly.r * xrayOverlay.width;
 
-            const formData = new FormData();
-            formData.append('image', uploadedFile);
-
-            try {
-                const response = await fetch('http://127.0.0.1:5000/predict', { method: 'POST', body: formData });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Server error: ${response.statusText}`);
-                }
-                const result = await response.json();
-                displayResults(result);
-            } catch (error) {
-                console.error('Error during analysis:', error);
-                alert('Analysis failed: ' + error.message);
-                resetAnalysisUI();
-            }
-        }
-
-        function resetAnalysisUI() {
-            analyzeBtn.innerHTML = 'Analyze X-ray';
-            analyzeBtn.disabled = false;
-        }
-
-        function displayResults(data) {
-            analysisResultData = data;
-            patientForm.classList.add('hidden');
-            analysisResults.classList.remove('hidden');
-
-            const predictionTitle = document.getElementById('predictionTitle');
-            const predictionBadge = document.getElementById('predictionBadge');
-            if (data.prediction === 'Pneumonia Detected') {
-                predictionTitle.textContent = 'Pneumonia Detected';
-                predictionBadge.textContent = 'PNEUMONIA';
-                predictionBadge.className = 'prediction-badge pneumonia';
-            } else {
-                predictionTitle.textContent = 'Normal';
-                predictionBadge.textContent = 'NORMAL';
-                predictionBadge.className = 'prediction-badge normal';
-            }
-
-            document.getElementById('confidenceValue').textContent = `${(data.confidence * 100).toFixed(0)}%`;
-            document.getElementById('guidanceContent').textContent = data.guidance;
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                xrayImage.src = e.target.result;
-                xrayImage.onload = () => drawOverlay(data.anomalies);
-            };
-            reader.readAsDataURL(uploadedFile);
-        }
-
-        function drawOverlay(anomalies) {
-            xrayOverlay.width = xrayImage.clientWidth;
-            xrayOverlay.height = xrayImage.clientHeight;
-            ctx.clearRect(0, 0, xrayOverlay.width, xrayOverlay.height);
-            if (!anomalies || anomalies.length === 0) return;
-            ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
-            anomalies.forEach(anomaly => {
-                const x = anomaly.x * xrayOverlay.width;
-                const y = anomaly.y * xrayOverlay.height;
-                const radius = anomaly.r * Math.min(xrayOverlay.width, xrayOverlay.height);
-                ctx.beginPath();
-                ctx.arc(x, y, radius, 0, 2 * Math.PI);
-                ctx.fill();
-            });
-        }
-    </script>
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, 2 * Math.PI);
+            ctx.fill();
+        });
+    }
+</script>
 </body>
 </html>

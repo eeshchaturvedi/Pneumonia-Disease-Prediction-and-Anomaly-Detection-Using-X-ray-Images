@@ -35,7 +35,7 @@ except Exception as e:
 # --- NEW: Configure Generative AI ---
 try:
     # NOTE: Your API key is hardcoded. For better security, use environment variables.
-    API_KEY = '' # From your provided file, open sourced API key shall be added in the provided single quotes
+    API_KEY = 'AIzaSyDSTTkSOCGJLhtpFbcTkgomKvdtDnJndho' # From your provided file
     if not API_KEY:
         print("--- WARNING: GOOGLE_API_KEY environment variable not found. Guidance feature will be disabled. ---")
         genai_model = None
@@ -148,4 +148,3 @@ def predict():
 # --- Main Execution Block ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-

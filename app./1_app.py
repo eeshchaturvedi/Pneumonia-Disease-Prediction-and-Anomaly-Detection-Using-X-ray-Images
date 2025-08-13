@@ -4,12 +4,15 @@ import random
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+import base64
+from io import BytesIO
 
 # --- ML/Image Processing Imports ---
 import cv2
 import numpy as np
-from tensorflow.keras.models import load_model
-from tensorflow.keras.losses import MeanSquaredError # Correct import for the custom_objects fix
+import tensorflow as tf
+from tensorflow.keras.models import load_model, Model
+from tensorflow.keras.losses import MeanSquaredError
 
 # --- Generative AI Imports ---
 import google.generativeai as genai
@@ -17,12 +20,11 @@ import google.generativeai as genai
 # --- Configuration ---
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-ANOMALY_THRESHOLD = 0.002 
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-CORS(app, origins="http://127.0.0.1:5500", supports_credentials=True) 
+CORS(app, origins="http://127.0.0.1:5500", supports_credentials=True)
 
 # --- Load Your Models ---
 try:
@@ -32,16 +34,13 @@ except Exception as e:
     print(f"--- Error loading classification model: {e} ---")
     classifier_model = None
 
+# --- NEW: Load Sub-Classification Model ---
 try:
-    anomaly_model = load_model(
-        'anomaly_detector_1.h5',
-        custom_objects={'mse': MeanSquaredError()},
-        compile=False
-    )
-    print("--- Anomaly Detection Model loaded successfully ---")
+    sub_classifier_model = load_model('bacteria_vs_viral_resnet_best_model_2nd_attempt.h5')
+    print("--- Sub-Classification Model (Bacterial/Viral) loaded successfully ---")
 except Exception as e:
-    print(f"--- Error loading anomaly model: {e} ---")
-    anomaly_model = None
+    print(f"--- Error loading sub-classification model: {e} ---")
+    sub_classifier_model = None
 
 # --- Configure Generative AI ---
 try:
@@ -61,115 +60,109 @@ except Exception as e:
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def generate_health_guidance(prediction_text, is_anomaly):
+# --- MODIFIED: Generative AI Function for initial guidance ---
+def generate_initial_guidance(prediction_text):
     if not genai_model:
         return "Guidance feature is currently unavailable."
     
-    if is_anomaly and prediction_text == "Normal":
-        finding_text = "The model did not find signs of pneumonia but did flag some unusual areas in the image that may warrant a closer look."
-    else:
-        finding_text = f"The model's primary finding is: {prediction_text}."
-
-    prompt = f"You are an AI health assistant. Based on the finding: '{finding_text}', provide empathetic guidance. Focus on next steps like consulting a professional. Do not diagnose. Start with 'Based on the findings:'"
+    prompt = f"You are an AI health assistant. A chest X-ray analysis has just been performed with the primary finding of '{prediction_text}'. Provide an initial, empathetic, and helpful message. Explain that this is a preliminary assessment and strongly recommend consulting a medical professional. Keep it concise and start the conversation. Do not use markdown."
     try:
         response = genai_model.generate_content(prompt)
         return response.text
     except Exception as e:
         print(f"--- Gemini API call failed: {e} ---")
-        return "Could not generate guidance at this time."
+        return "Could not generate initial guidance at this time."
 
-# --- MODIFIED: Real Anomaly Detection Function ---
-def get_anomaly_details(image_path):
-    if not anomaly_model:
-        return False, []
+# --- Grad-CAM XAI Functionality ---
+def make_gradcam_heatmap(img_array, model, last_conv_layer_name):
+    grad_model = Model([model.inputs], [model.get_layer(last_conv_layer_name).output, model.output])
+    with tf.GradientTape() as tape:
+        last_conv_layer_output, preds = grad_model(img_array)
+        class_channel = preds[0] # For binary classification with single output
+    grads = tape.gradient(class_channel, last_conv_layer_output)
+    pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
+    last_conv_layer_output = last_conv_layer_output[0]
+    heatmap = last_conv_layer_output @ pooled_grads[..., tf.newaxis]
+    heatmap = tf.squeeze(heatmap)
+    heatmap = tf.maximum(heatmap, 0) / (tf.math.reduce_max(heatmap) + 1e-8) # Add epsilon for stability
+    return heatmap.numpy()
 
-    print("--- Running Real Anomaly Detection ---")
-    img_height, img_width = 224, 224
-    img = cv2.imread(image_path)
-    if img is None:
-        raise ValueError(f"Image not found at path: {image_path}")
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, (img_height, img_width))
-    img_normalized = img / 255.0
-    img_reshaped = np.expand_dims(img_normalized, axis=0)
+def generate_heatmap_image_base64(original_image_path, heatmap):
+    img = cv2.imread(original_image_path)
+    if img is None: return None
+    img = cv2.resize(img, (224, 224))
+    heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+    heatmap = np.uint8(255 * heatmap)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    superimposed_img = heatmap * 0.4 + img
+    superimposed_img = np.clip(superimposed_img, 0, 255).astype('uint8')
+    is_success, buffer = cv2.imencode(".png", superimposed_img)
+    if not is_success: return None
+    return base64.b64encode(buffer).decode('utf-8')
 
-    reconstructed_img = anomaly_model.predict(img_reshaped)[0]
-    
-    mse = np.mean(np.square(img_normalized - reconstructed_img))
-    is_anomaly = mse > ANOMALY_THRESHOLD
-    print(f"--- Anomaly MSE: {mse:.4f} (Threshold: {ANOMALY_THRESHOLD}) -> Is Anomaly: {is_anomaly} ---")
-
-    anomalies = []
-    if is_anomaly:
-        diff_map = np.abs(img_normalized - reconstructed_img)
-        diff_map = np.mean(diff_map, axis=-1)
-        diff_map_norm = (diff_map - np.min(diff_map)) / (np.max(diff_map) - np.min(diff_map) + 1e-8)
-        diff_map_uint8 = (diff_map_norm * 255).astype("uint8")
-        _, thresh = cv2.threshold(diff_map_uint8, 50, 255, cv2.THRESH_BINARY)
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        for contour in contours:
-            (x, y), radius = cv2.minEnclosingCircle(contour)
-            if radius > 10:
-                # --- FIX APPLIED HERE: Normalize coordinates to be between 0 and 1 ---
-                anomalies.append({
-                    "x": x / img_width,
-                    "y": y / img_height,
-                    "r": radius / img_width
-                })
-    return bool(is_anomaly), anomalies
-
+# --- MODIFIED: Full Analysis Function ---
 def run_full_analysis(image_path):
     if not classifier_model: raise RuntimeError("Classification model not loaded.")
 
     print(f"--- Running Classification on {image_path} ---")
     img_cls = cv2.imread(image_path)
-    if img_cls is None:
-        raise ValueError(f"Image not found at path: {image_path}")
+    if img_cls is None: raise ValueError(f"Image not found at path: {image_path}")
     img_cls = cv2.cvtColor(img_cls, cv2.COLOR_BGR2RGB)
     img_cls = cv2.resize(img_cls, (224, 224))
-    img_cls = img_cls / 255.0
-    img_cls = np.expand_dims(img_cls, axis=0)
+    img_cls_norm = img_cls / 255.0
+    img_cls_norm = np.expand_dims(img_cls_norm, axis=0)
     
-    prediction_raw = classifier_model.predict(img_cls)
-    prediction_flat = prediction_raw.flatten()
-
-    if len(prediction_flat) > 1:
-        prediction_score = float(prediction_flat[1])
-    else:
-        prediction_score = float(prediction_flat[0])
+    # Primary classification (Normal vs. Pneumonia)
+    prediction_raw = classifier_model.predict(img_cls_norm)
+    prediction_score = float(prediction_raw.flatten()[0])
     
     if prediction_score > 0.5:
-        prediction = "Pneumonia Detected"
+        # If Pneumonia is detected, perform sub-classification
+        prediction_text = "Pneumonia Detected" # Default text
+        confidence = prediction_score
+
+        if sub_classifier_model:
+            print("--- Pneumonia detected, running sub-classification... ---")
+            sub_prediction_raw = sub_classifier_model.predict(img_cls_norm)
+            sub_prediction_score = float(sub_prediction_raw.flatten()[0])
+            
+            # Assuming the model was trained with Bacterial as class 0 and Viral as class 1
+            if sub_prediction_score > 0.5:
+                prediction_text = "Viral Pneumonia Detected"
+            else:
+                prediction_text = "Bacterial Pneumonia Detected"
+        else:
+            print("--- Sub-classification model not loaded, returning general diagnosis. ---")
+
     else:
-        prediction = "Normal"
+        prediction_text = "Normal"
+        confidence = 1 - prediction_score
     
-    confidence = prediction_score if prediction == "Pneumonia Detected" else 1 - prediction_score
+    last_conv_layer_name = next((layer.name for layer in reversed(classifier_model.layers) if 'conv' in layer.name), None)
+    if not last_conv_layer_name: raise RuntimeError("Could not find a convolutional layer for Grad-CAM.")
     
-    is_anomaly, anomaly_coords = get_anomaly_details(image_path)
-    guidance_text = generate_health_guidance(prediction, is_anomaly)
+    heatmap = make_gradcam_heatmap(img_cls_norm, classifier_model, last_conv_layer_name)
+    heatmap_base64 = generate_heatmap_image_base64(image_path, heatmap)
+    
+    # Guidance will now use the more specific prediction text
+    guidance_text = generate_initial_guidance(prediction_text)
 
     result = {
-        "prediction": prediction, "confidence": round(confidence, 2),
-        "anomalies": anomaly_coords, "is_anomaly": is_anomaly,
-        "guidance": guidance_text
+        "prediction": prediction_text, "confidence": round(confidence, 2),
+        "guidance": guidance_text, "heatmap_image_base64": heatmap_base64
     }
-    
-    print(f"--- Final Analysis Result: {result} ---")
+    print(f"--- Initial Analysis Result Sent: {prediction_text} ---")
     return result
 
-# --- API Endpoint ---
+# --- API Endpoints ---
 @app.route('/predict', methods=['POST'])
 def predict():
-    if 'image' not in request.files:
-        return jsonify({"error": "No image file provided"}), 400
+    if 'image' not in request.files: return jsonify({"error": "No image file provided"}), 400
     file = request.files['image']
-    if file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+    if file.filename == '': return jsonify({"error": "No selected file"}), 400
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        if not os.path.exists(app.config['UPLOAD_FOLDER']):
-            os.makedirs(app.config['UPLOAD_FOLDER'])
+        if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLOAD_FOLDER'])
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         try:
@@ -179,10 +172,37 @@ def predict():
             print(f"An error occurred during inference: {e}")
             return jsonify({"error": "Failed to process the image"}), 500
         finally:
-            if os.path.exists(filepath):
-                os.remove(filepath)
+            if os.path.exists(filepath): os.remove(filepath)
     else:
         return jsonify({"error": "File type not allowed"}), 400
+
+# --- NEW: Chat Endpoint ---
+@app.route('/chat', methods=['POST'])
+def chat():
+    if not genai_model:
+        return jsonify({"error": "Chat feature is not configured."}), 503
+    
+    data = request.get_json()
+    history = data.get('history', [])
+    user_message = data.get('message', '')
+
+    if not user_message:
+        return jsonify({"error": "Empty message received."}), 400
+
+    # Reformat history for the Gemini API
+    chat_session = genai_model.start_chat(history=[])
+    for msg in history:
+        role = 'user' if msg['sender'] == 'user' else 'model'
+        chat_session.history.append({'role': role, 'parts': [{'text': msg['content']}]})
+    
+    try:
+        print(f"--- Sending to Gemini: {user_message} ---")
+        response = chat_session.send_message(user_message)
+        return jsonify({"reply": response.text})
+    except Exception as e:
+        print(f"--- Gemini API chat call failed: {e} ---")
+        return jsonify({"error": "Could not get a response from the AI assistant."}), 500
+
 
 # --- Main Execution Block ---
 if __name__ == '__main__':
